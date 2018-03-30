@@ -1,32 +1,8 @@
 pragma solidity ^0.4.19;
-import "zeppelin-solidity/contracts/token/ERC20/MintableToken.sol";
+import "ethworks-solidity/contracts/IcoToken.sol";
 
-contract PixelToken is MintableToken {
-    string public name = "PixelToken";
-    string public symbol = "PXL";
-    uint8 public decimals = 18;
-    uint256 public cap;
-
-    function PixelToken(uint256 _cap) public {
-        require(_cap > 0);
-        cap = _cap;
-    }
-
-    // override
-    function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
-        require(totalSupply_.add(_amount) <= cap);
-        return super.mint(_to, _amount);
-    }
-
-    // override
-    function transfer(address _to, uint256 _value) public returns (bool) {
-        require(mintingFinished);
-        return super.transfer(_to, _value);
-    }
-
-    // override
-    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
-        require(mintingFinished);
-        return super.transferFrom(_from, _to, _value);
+contract PixelToken is IcoToken {
+    function PixelToken(uint256 _cap) public IcoToken(_cap, "PixelToken", "PXL", 18) {
     }
 }
+
