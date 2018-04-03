@@ -2887,9 +2887,9 @@ ethjs-util@^0.1.3:
     is-hex-prefixed "1.0.0"
     strip-hex-prefix "1.0.0"
 
-ethworks-solidity@Ethworks/ethworks-solidity#bf8b97d381bec5dd99b575bb54c9def111fa1661:
+ethworks-solidity@Ethworks/ethworks-solidity#f4e2232691dbf04f5bd0d1e675ef0127076257aa:
   version "1.0.0"
-  resolved "https://codeload.github.com/Ethworks/ethworks-solidity/tar.gz/bf8b97d381bec5dd99b575bb54c9def111fa1661"
+  resolved "https://codeload.github.com/Ethworks/ethworks-solidity/tar.gz/f4e2232691dbf04f5bd0d1e675ef0127076257aa"
   dependencies:
     zeppelin-solidity "1.6.0"
 

@@ -1,8 +1,8 @@
 pragma solidity ^0.4.19;
-import "ethworks-solidity/contracts/IcoToken.sol";
+import "ethworks-solidity/contracts/CrowdfundableToken.sol";
 
-contract PixelToken is IcoToken {
-    function PixelToken(uint256 _cap) public IcoToken(_cap, "PixelToken", "PXL", 18) {
+contract PixelToken is CrowdfundableToken {
+    function PixelToken(uint256 _cap) public CrowdfundableToken(_cap, "PixelToken", "PXL", 18) {
     }
 }
 

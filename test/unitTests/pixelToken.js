@@ -1,14 +1,14 @@
-import {createWeb3, deployContract} from '../testUtils.js';
+import {createWeb3, deployContract} from 'ethworks-solidity';
 import pixelTokenJson from '../../build/contracts/PixelToken.json';
 import chai from 'chai';
 import bnChai from 'bn-chai';
+import Web3 from 'web3';
 
 const {expect} = chai;
-const web3 = createWeb3();
+const web3 = createWeb3(Web3);
 chai.use(bnChai(web3.utils.BN));
 
 describe('PixelToken', () => {
-  const web3 = createWeb3();
   const {BN} = web3.utils;
   let tokenOwner;
   let tokenContract;
