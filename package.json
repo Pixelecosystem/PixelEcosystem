@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev:lint": "./node_modules/.bin/eslint **/*.js",
+    "dev:lint": "./node_modules/.bin/eslint **/*.js test/unitTests/*.js",
     "dev:compile": "truffle compile",
     "dev:test": "rm ./build/contracts/* ; truffle compile && mocha --require test/testPolyfill.js --require babel-polyfill --require babel-register --recursive test/unitTests/"
   },

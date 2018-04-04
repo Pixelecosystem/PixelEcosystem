@@ -26,7 +26,7 @@ contract PixelCampaign is Ownable {
     bool public isFunded = false;
     address public influencer = 0x0;
     bool public influencerFundsReleased = false;
-    bool public disapproved = false;
+    bool public isDisapproved = false;
     uint256 releasedFanCount = 0;
 
     function PixelCampaign(CrowdfundableToken _token, Whitelist _whitelist, string _criteria, uint256 _deadline, address _verifier) public {
@@ -43,18 +43,23 @@ contract PixelCampaign is Ownable {
         verifier = _verifier;
     }
 
-    modifier funded() {
+    modifier onlyFunded() {
         require(isFunded);
         _;
     }
 
-    modifier accepted() {
+    modifier onlyAccepted() {
         require(influencer != 0x0);
         _;
     }
 
     modifier afterDeadline() {
         require(now > deadline);
+        _;
+    }
+
+    modifier onlyVerifier() {
+        require(msg.sender == verifier);
         _;
     }
 
@@ -76,25 +81,37 @@ contract PixelCampaign is Ownable {
         Funded(msg.sender);
     }
 
-    function accept() public funded {
+    function accept() public onlyFunded {
         require(influencer == 0x0);
-        require(!disapproved);
+        require(!isDisapproved);
         require(whitelist.isWhitelisted(msg.sender));
         influencer = msg.sender;
         Accepted(msg.sender);
     }
 
     function disapprove() public onlyOwner afterDeadline {
-        require(!disapproved && !influencerFundsReleased);
+        require(!isDisapproved && !influencerFundsReleased);
         require(token.transfer(msg.sender, influencerTotalAllocation));
-        disapproved = true;
+        isDisapproved = true;
         Disapproved();
     }
 
-    function releaseInfluencerFunds() public onlyOwner accepted {
-        require(!disapproved && !influencerFundsReleased);
+    function releaseInfluencerFunds() public onlyOwner onlyAccepted {
+        require(!isDisapproved && !influencerFundsReleased);
         require(token.transfer(influencer, influencerTotalAllocation));
         influencerFundsReleased = true;
         InfluencerFundsReleased();
+    }
+
+    function releaseFanFunds(address _fan) public onlyVerifier {
+        require(releasedFanCount < fanCount);
+        require(_fan != 0x0);
+
+        releasedFanCount = releasedFanCount.add(1);
+        require(token.transfer(_fan, fanSingleAllocation));
+        require(token.transfer(verifier, verifierSingleAllocation));
+
+        VerifierFundsReleased();
+        FanFundsReleased(_fan);
     }
 }

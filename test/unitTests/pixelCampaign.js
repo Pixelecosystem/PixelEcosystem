@@ -28,13 +28,15 @@ describe('PixelCampaign', () => {
   let notWhitelistedInfluencer;
   let verifier;
   let deadline;
+  let fan1;
+  let fan2;
   const tokenCap = new BN(500000000);
   const criteria = '<soft criteria text>';
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const influencerTotalAllocation = new BN('1000');
   const fanSingleAllocation = new BN('10');
   const verifierSingleAllocation = new BN('1');
-  const fanCount = new BN('3');
+  const fanCount = new BN('5');
   const funding = influencerTotalAllocation.add(fanSingleAllocation.mul(fanCount)).add(verifierSingleAllocation.mul(fanCount));
 
   const balanceOf = async (client) => tokenContract.methods.balanceOf(client).call({from: tokenOwner});
@@ -42,10 +44,13 @@ describe('PixelCampaign', () => {
   const advanceToAfterDeadline = async () => increaseTimeTo(web3, deadline.add(duration.hours(12)));
   const disapprove = async (from) => campaignContract.methods.disapprove().send({from});
   const releaseInfluencerFunds = async (from) => campaignContract.methods.releaseInfluencerFunds().send({from});
+  const releaseFanFunds = async (fan, from) => campaignContract.methods.releaseFanFunds(fan).send({from});
+  const isDisapproved = async () => campaignContract.methods.isDisapproved().call();
+  const influencerFundsReleased = async() => campaignContract.methods.influencerFundsReleased().call();
 
   before(async () => {
     accounts = await web3.eth.getAccounts();
-    [, tokenOwner, whitelistOwner, influencer, brand, notWhitelistedInfluencer, verifier] = accounts;
+    [, tokenOwner, whitelistOwner, influencer, brand, notWhitelistedInfluencer, verifier, fan1, fan2] = accounts;
   });
 
   beforeEach(async () => {
@@ -101,63 +106,93 @@ describe('PixelCampaign', () => {
     });
 
     it('Should not allow to create campaign without verifier', async () => {
-      const now = new BN(await latestTime(web3));
       await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, criteria, deadline, zeroAddress]);
     });
   });
 
   describe('Funding', async () => {
+    const isFunded = async (campaign) => campaign.methods.isFunded().call();
+    let unfundedCampaign;
+
+    const increaseApproval = async() => {
+      await tokenContract.methods.increaseApproval(unfundedCampaign.options.address, funding).send({from: brand});
+    };
+
+    const fund = async (args) => {
+      await unfundedCampaign.methods.fund.apply(this, args).send({from: brand});
+    };
+    const fundArgs = [influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount];
+
+    const testShouldFund = async (args) => {
+      await fund(args);
+      expect(await isFunded(unfundedCampaign)).to.be.true;
+    };
+
+    const testShouldNotFund = async (args) => {
+      await expectThrow(fund(args));
+      expect(await isFunded(unfundedCampaign)).to.be.false;
+      expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(0);
+    };
+
+    beforeEach(async () => {
+      unfundedCampaign = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
+    });
+
     it('Should not be funded initially', async () => {
-      const unfundedCampaign = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
       expect(await unfundedCampaign.methods.isFunded().call()).to.be.false;
     });
 
     it('Should allow to fund', async () => {
-      const unfundedCampaign = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
-      await tokenContract.methods.increaseApproval(unfundedCampaign.options.address, funding).send({from: brand});
-      await unfundedCampaign.methods.fund(influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount).send({from: brand});
-      expect(await unfundedCampaign.methods.isFunded().call()).to.be.true;
+      await increaseApproval();
+      await testShouldFund(fundArgs);
       expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(funding);
     });
 
     it('Should not allow to fund without allowing tokens', async () => {
-      const unfundedCampaign = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
-      await expectThrow(unfundedCampaign.methods.fund(influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount).send({from: brand}));
-      expect(await unfundedCampaign.methods.isFunded().call()).to.be.false;
-      expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(0);
+      await testShouldNotFund(fundArgs);
+    });
+
+    it('Should not allow to fund if brand does not have enough token balance', async () => {
+      await increaseApproval();
+      await tokenContract.methods.transfer(fan2, await balanceOf(brand)).send({from: brand});
+      await testShouldNotFund(fundArgs);
     });
 
     it('Should not allow to fund without influencer funds', async () => {
-      const unfundedCampaign = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
-      await tokenContract.methods.increaseApproval(unfundedCampaign.options.address, funding).send({from: brand});
-      await expectThrow(unfundedCampaign.methods.fund(0, fanSingleAllocation, verifierSingleAllocation, fanCount).send({from: brand}));
-      expect(await unfundedCampaign.methods.isFunded().call()).to.be.false;
-      expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(0);
+      await increaseApproval();
+      await testShouldNotFund([0, fanSingleAllocation, verifierSingleAllocation, fanCount]);
     });
 
     it('Should allow to fund without fans', async () => {
-      const unfundedCampaign = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
-      await tokenContract.methods.increaseApproval(unfundedCampaign.options.address, funding).send({from: brand});
-      await unfundedCampaign.methods.fund(influencerTotalAllocation, 0, 0, 0).send({from: brand});
-      expect(await unfundedCampaign.methods.isFunded().call()).to.be.true;
+      await increaseApproval();
+      await testShouldFund([influencerTotalAllocation, 0, 0, 0]);
       expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(influencerTotalAllocation);
     });
   });
 
   describe('Accepting campaign', async () => {
+    const testShouldAccept = async (from) => {
+      await accept(from);
+      expect(await campaignContract.methods.influencer().call()).to.be.equal(from);
+    };
+
+    const testShouldNotAccept = async (from) => {
+      const initialInfluencer = await campaignContract.methods.influencer().call();
+      await expectThrow(accept(from));
+      expect(await campaignContract.methods.influencer().call()).to.be.equal(initialInfluencer);
+    };
+
     it('Should allow to be accepted by whitelisted influencer', async () => {
-      await accept(influencer);
-      expect(await campaignContract.methods.influencer().call()).to.be.equal(influencer);
+      await testShouldAccept(influencer);
     });
 
     it('Should not allow to be accepted by not whitelisted influencer', async () => {
-      await expectThrow(accept(notWhitelistedInfluencer));
-      expect(await campaignContract.methods.influencer().call()).to.be.equal(zeroAddress);
+      await testShouldNotAccept(notWhitelistedInfluencer);
     });
 
     it('Should not allow to be accepted twice', async () => {
-      await accept(influencer);
-      await expectThrow(accept(influencer));
+      await testShouldAccept(influencer);
+      await testShouldNotAccept(notWhitelistedInfluencer);
     });
 
     it('Should not allow to accept if not funded', async () => {
@@ -168,76 +203,93 @@ describe('PixelCampaign', () => {
 
     it('Should allow to accept after deadline', async () => {
       await advanceToAfterDeadline();
-      await accept(influencer);
-      expect(await campaignContract.methods.influencer().call()).to.be.equal(influencer);
+      await testShouldAccept(influencer);
     });
 
     it('Should not allow to accept if disapproved', async () => {
       await advanceToAfterDeadline();
       await disapprove(brand);
-      await expectThrow(accept(influencer));
-      expect(await campaignContract.methods.influencer().call()).to.be.equal(zeroAddress);
+      await testShouldNotAccept(influencer);
     });
   });
 
   describe('Disapproving', async () => {
+    const testShouldDisapprove = async (from) => {
+      const initialBalance = new BN(await balanceOf(from));
+      await disapprove(from);
+      expect(await isDisapproved()).to.be.true;
+      expect(await balanceOf(from)).to.eq.BN(initialBalance.add(influencerTotalAllocation));
+    };
+
+    const testShouldNotDisapprove = async (from) => {
+      const initialBalance = new BN(await balanceOf(from));
+      const initialDisapproved = await isDisapproved();
+      await expectThrow(disapprove(from));
+      expect(await isDisapproved()).to.be.equal(initialDisapproved);
+      expect(await balanceOf(from)).to.eq.BN(initialBalance);
+    };
+    
+    it('Should allow to be disapproved by the brand', async () => {
+      await advanceToAfterDeadline();
+      await testShouldDisapprove(brand);
+    });
+
     it('Should not allow to be disapproved befere deadline', async () => {
-      await expectThrow(disapprove(brand));
+      await testShouldNotDisapprove(brand);
     });
 
     it('Should not allow to be disapproved by anyone other than the brand', async () => {
       await advanceToAfterDeadline();
-      await expectThrow(disapprove(influencer));
-      await expectThrow(disapprove(verifier));
-    });
-
-    it('Should allow to be disapproved by the brand', async () => {
-      await advanceToAfterDeadline();
-      const initialBalance = new BN(await balanceOf(brand));
-      await disapprove(brand);
-      expect(await balanceOf(brand)).to.eq.BN(initialBalance.add(influencerTotalAllocation));
+      await testShouldNotDisapprove(fan1);
+      await testShouldNotDisapprove(influencer);
+      await testShouldNotDisapprove(verifier);
     });
 
     it('Should not allow to be disapproved twice', async () => {
       await advanceToAfterDeadline();
       await disapprove(brand);
-      await expectThrow(disapprove(brand));
+      await testShouldNotDisapprove(brand);
     });
   });
 
   describe('Releasing influencer funds', async () => {
+    const testShouldReleaseInfluencerFunds = async (from) => {
+      const initialBalance = new BN(await balanceOf(influencer));
+      await releaseInfluencerFunds(from);
+      expect(await balanceOf(influencer)).to.be.eq.BN(initialBalance.add(influencerTotalAllocation));
+    };
+
+    const testShouldNotReleaseInfluencerFunds = async (from) => {
+      const initialBalance = new BN(await balanceOf(campaignContractAddress));
+      await expectThrow(releaseInfluencerFunds(from));
+      expect(await balanceOf(campaignContractAddress)).to.be.eq.BN(initialBalance);
+    };
+
     it('Should allow to release influencer funds by the brand', async () => {
       await accept(influencer);
-      const initialBalance = new BN(await balanceOf(influencer));
-      await releaseInfluencerFunds(brand);
-      expect(await balanceOf(influencer)).to.be.eq.BN(initialBalance.add(influencerTotalAllocation));
+      await testShouldReleaseInfluencerFunds(brand);
     });
 
     it('Should not allow to release influencer funds by anyone other than the brand', async () => {
-      const initialBalance = new BN(await balanceOf(campaignContractAddress));
-      await expectThrow(releaseInfluencerFunds(influencer));
-      await expectThrow(releaseInfluencerFunds(verifier));
-      expect(await balanceOf(campaignContractAddress)).to.be.eq.BN(initialBalance);
+      await accept(influencer);
+      await testShouldNotReleaseInfluencerFunds(influencer);
+      await testShouldNotReleaseInfluencerFunds(verifier);
     });
 
     it('Should not allow to release influencer funds twice', async () => {
       await accept(influencer);
-      await releaseInfluencerFunds(brand);
-      await expectThrow(releaseInfluencerFunds(brand));
+      await testShouldReleaseInfluencerFunds(brand);
+      await testShouldNotReleaseInfluencerFunds(brand);
     });
 
     it('Should allow to release influencer funds by the brand after deadline', async () => {
       await accept(influencer);
-      const initialBalance = new BN(await balanceOf(influencer));
       await advanceToAfterDeadline();
-      await releaseInfluencerFunds(brand);
-      expect(await balanceOf(influencer)).to.be.eq.BN(initialBalance.add(influencerTotalAllocation));
+      await testShouldReleaseInfluencerFunds(brand);
     });
 
     it('Should not allow to release influencer funds if challenge not accepted', async () => {
-      const initialBalance = new BN(await balanceOf(campaignContractAddress));
-      await expectThrow(releaseInfluencerFunds(brand));
-      expect(await balanceOf(campaignContractAddress)).to.be.eq.BN(initialBalance);
+      await testShouldNotReleaseInfluencerFunds(brand);
     });
   });
 
@@ -250,45 +302,85 @@ describe('PixelCampaign', () => {
     it('Should not allow to release influencer funds after disapproving', async () => {
       await disapprove(brand);
       await expectThrow(releaseInfluencerFunds(brand));
-      expect(await campaignContract.methods.disapproved().call()).to.be.equal(true);
-      expect(await campaignContract.methods.influencerFundsReleased().call()).to.be.equal(false);
+      expect(await isDisapproved()).to.be.equal(true);
+      expect(await influencerFundsReleased()).to.be.equal(false);
     });
 
     it('Should not allow to disapprove after releasing influencer funds', async () => {
       await releaseInfluencerFunds(brand);
       await expectThrow(disapprove(brand));
-      expect(await campaignContract.methods.influencerFundsReleased().call()).to.be.equal(true);
-      expect(await campaignContract.methods.disapproved().call()).to.be.equal(false);
+      expect(await influencerFundsReleased()).to.be.equal(true);
+      expect(await isDisapproved()).to.be.equal(false);
     });
   });
 
-  xdescribe('Releasing fan funds', async () => {
-    it('Should allow to release fan funds', async () => {
+  const releaseAllFanFunds = async () => {
+    let i; // eslint-disable-line id-length
+    for (i = 0; i < fanCount.toNumber(); i++) {
+      await releaseFanFunds(fan1, verifier);
+    }
+  };
 
+  describe('Releasing fan funds', async () => {
+    const testShouldReleaseFanFunds = async (fan, from) => {
+      const initialFanBalance = new BN(await balanceOf(fan));
+      const initialVerifierBalance = new BN(await balanceOf(verifier));
+      await releaseFanFunds(fan, from);
+      expect(await balanceOf(fan)).to.be.eq.BN(initialFanBalance.add(fanSingleAllocation));
+      expect(await balanceOf(verifier)).to.be.eq.BN(initialVerifierBalance.add(verifierSingleAllocation));
+    };
+
+    const testShouldNotReleaseFanFunds = async (fan, from) => {
+      const initialFanBalance = new BN(await balanceOf(fan));
+      const initialVerifierBalance = new BN(await balanceOf(verifier));
+      await expectThrow(releaseFanFunds(fan, from));
+      expect(await balanceOf(fan)).to.be.eq.BN(initialFanBalance);
+      expect(await balanceOf(verifier)).to.be.eq.BN(initialVerifierBalance);
+    };
+
+    it('Should allow to release fan funds', async () => {
+      await testShouldReleaseFanFunds(fan1, verifier);
+    });
+
+    it('Should allow to release funds for the same fan multiple times', async () => {
+      await testShouldReleaseFanFunds(fan1, verifier);
+      await testShouldReleaseFanFunds(fan2, verifier);
+      await testShouldReleaseFanFunds(fan2, verifier);
+      await testShouldReleaseFanFunds(fan1, verifier);
     });
 
     it('Should not allow to release fan funds by anyone other than verifier', async () => {
-
-    });
-
-    it('Should allow to release fan funds after disapproving', async () => {
-
-    });
-
-    it('Should allow to release fan funds after relasing infuencer funds', async () => {
-
+      await testShouldNotReleaseFanFunds(fan1, fan1);
+      await testShouldNotReleaseFanFunds(fan1, brand);
     });
 
     it('Should allow to release fan funds after deadline', async () => {
-
+      await advanceToAfterDeadline();
+      await testShouldReleaseFanFunds(fan1, verifier);
     });
 
-    it('Should release all verifier and fan funds after releasing for all fans', async () => {
+    it('Should allow to release fan funds after disapproving', async () => {
+      await advanceToAfterDeadline();
+      await disapprove(brand);
+      await testShouldReleaseFanFunds(fan1, verifier);
+    });
 
+    it('Should allow to release fan funds after relasing infuencer funds', async () => {
+      await accept(influencer);
+      await releaseInfluencerFunds(brand);
+      await testShouldReleaseFanFunds(fan1, verifier);
     });
 
     it('Should not allow to release more fan funds than the fan count', async () => {
-
+      await releaseAllFanFunds();
+      await testShouldNotReleaseFanFunds(fan1, verifier);
     });
+  });
+
+  it('Should release all token balance after releasing all fan, verifier and influencer funds', async () => {
+    await accept(influencer);
+    await releaseInfluencerFunds(brand);
+    await releaseAllFanFunds();
+    expect(await balanceOf(campaignContractAddress)).to.eq.BN(0);
   });
 });
