@@ -95,6 +95,6 @@ contract PixelCampaign is Ownable {
         require(!disapproved && !influencerFundsReleased);
         require(token.transfer(influencer, influencerTotalAllocation));
         influencerFundsReleased = true;
-        Disapproved();
+        InfluencerFundsReleased();
     }
 }
