@@ -4,8 +4,8 @@
   "main": "index.js",
   "scripts": {
     "dev:lint": "./node_modules/.bin/eslint **/*.js test/unitTests/*.js",
-    "dev:compile": "truffle compile",
-    "dev:test": "rm ./build/contracts/* ; truffle compile && mocha --require test/testPolyfill.js --require babel-polyfill --require babel-register --recursive test/unitTests/",
+    "dev:compile": "truffle compile --all",
+    "dev:test": "truffle compile --all && mocha --require test/testPolyfill.js --require babel-polyfill --require babel-register --recursive test/unitTests/",
     "deploy": "mocha --require test/testPolyfill.js --require babel-polyfill --require babel-register scripts/deploy.js"
   },
   "author": "Przemek <przemek@ethworks.io>",
@@ -29,10 +29,10 @@
     "ganache-core": "^2.0.2",
     "mocha": "^4.0.1",
     "solc": "^0.4.19",
-    "truffle": "^4.0.1",
+    "truffle": "^4.1.5",
     "web3": "^1.0.0-beta.29",
     "zeppelin-solidity": "1.6.0",
-    "ethworks-solidity": "Ethworks/ethworks-solidity#b13995001903ce0efc7a30e6b775bc9f8f954194"
+    "ethworks-solidity": "Ethworks/ethworks-solidity#920cb175e0273c076243823b4f403467d39223ee"
   },
   "devDependencies": {
     "babel-eslint": "^8.2.1",

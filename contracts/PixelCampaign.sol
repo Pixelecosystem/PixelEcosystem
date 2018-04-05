@@ -97,27 +97,27 @@ contract PixelCampaign is Ownable {
 
         require(token.transferFrom(msg.sender, this, getTotalFunding()));
         enterState(States.Funded);
-        Funded(msg.sender);
+        emit Funded(msg.sender);
     }
 
     function accept() public onlyAtState(States.Funded) onlyWhitelisted(msg.sender) {
         require(influencer == 0x0);
         influencer = msg.sender;
         enterState(States.Accepted);
-        Accepted(msg.sender);
+        emit Accepted(msg.sender);
     }
 
     function disapprove() public onlyOwner onlyAfterDeadline {
         require(currentState == States.Funded || currentState == States.Accepted);
         require(token.transfer(owner, influencerTotalAllocation));
         enterState(States.Disapproved);
-        Disapproved();
+        emit Disapproved();
     }
 
     function releaseInfluencerFunds() public onlyOwner onlyAtState(States.Accepted) {
         require(token.transfer(influencer, influencerTotalAllocation));
         enterState(States.InfluencerFundsReleased);
-        InfluencerFundsReleased();
+        emit InfluencerFundsReleased();
     }
 
     function releaseFanFunds(address _fan) public onlyVerifier {
@@ -128,7 +128,7 @@ contract PixelCampaign is Ownable {
         require(token.transfer(_fan, fanSingleAllocation));
         require(token.transfer(verifier, verifierSingleAllocation));
 
-        VerifierFundsReleased();
-        FanFundsReleased(_fan);
+        emit VerifierFundsReleased();
+        emit FanFundsReleased(_fan);
     }
 }
