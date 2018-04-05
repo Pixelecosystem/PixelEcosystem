@@ -39,14 +39,21 @@ describe('PixelCampaign', () => {
   const fanCount = new BN('5');
   const funding = influencerTotalAllocation.add(fanSingleAllocation.mul(fanCount)).add(verifierSingleAllocation.mul(fanCount));
 
+  const STATE_UNFUNDED = '0';
+  const STATE_FUNDED = '1';
+  const STATE_ACCEPTED = '2';
+  const STATE_INFLUENCERFUNDSRELEASED = '3';
+  const STATE_DISAPPROVED = '4';
+
   const balanceOf = async (client) => tokenContract.methods.balanceOf(client).call({from: tokenOwner});
   const accept = async (influencer) => campaignContract.methods.accept().send({from: influencer});
   const advanceToAfterDeadline = async () => increaseTimeTo(web3, deadline.add(duration.hours(12)));
   const disapprove = async (from) => campaignContract.methods.disapprove().send({from});
   const releaseInfluencerFunds = async (from) => campaignContract.methods.releaseInfluencerFunds().send({from});
   const releaseFanFunds = async (fan, from) => campaignContract.methods.releaseFanFunds(fan).send({from});
-  const isDisapproved = async () => campaignContract.methods.isDisapproved().call();
-  const influencerFundsReleased = async() => campaignContract.methods.influencerFundsReleased().call();
+  const getCurrentState = async () => campaignContract.methods.currentState().call();
+  const isDisapproved = async () => (await getCurrentState()) === STATE_DISAPPROVED;
+  const influencerFundsReleased = async() => (await getCurrentState()) === STATE_INFLUENCERFUNDSRELEASED;
 
   before(async () => {
     accounts = await web3.eth.getAccounts();
@@ -111,7 +118,7 @@ describe('PixelCampaign', () => {
   });
 
   describe('Funding', async () => {
-    const isFunded = async (campaign) => campaign.methods.isFunded().call();
+    const isFunded = async (campaign) => (await campaign.methods.currentState().call()) !== STATE_UNFUNDED;
     let unfundedCampaign;
 
     const increaseApproval = async() => {
@@ -139,7 +146,7 @@ describe('PixelCampaign', () => {
     });
 
     it('Should not be funded initially', async () => {
-      expect(await unfundedCampaign.methods.isFunded().call()).to.be.false;
+      expect(await isFunded(unfundedCampaign)).to.be.false;
     });
 
     it('Should allow to fund', async () => {
@@ -223,9 +230,9 @@ describe('PixelCampaign', () => {
 
     const testShouldNotDisapprove = async (from) => {
       const initialBalance = new BN(await balanceOf(from));
-      const initialDisapproved = await isDisapproved();
+      const initialState = await getCurrentState();
       await expectThrow(disapprove(from));
-      expect(await isDisapproved()).to.be.equal(initialDisapproved);
+      expect(await getCurrentState()).to.be.equal(initialState);
       expect(await balanceOf(from)).to.eq.BN(initialBalance);
     };
     
@@ -256,12 +263,15 @@ describe('PixelCampaign', () => {
     const testShouldReleaseInfluencerFunds = async (from) => {
       const initialBalance = new BN(await balanceOf(influencer));
       await releaseInfluencerFunds(from);
+      expect(await influencerFundsReleased()).to.be.equal(true);
       expect(await balanceOf(influencer)).to.be.eq.BN(initialBalance.add(influencerTotalAllocation));
     };
 
     const testShouldNotReleaseInfluencerFunds = async (from) => {
       const initialBalance = new BN(await balanceOf(campaignContractAddress));
+      const initialState = await getCurrentState();
       await expectThrow(releaseInfluencerFunds(from));
+      expect(await getCurrentState()).to.be.equal(initialState);
       expect(await balanceOf(campaignContractAddress)).to.be.eq.BN(initialBalance);
     };
 
