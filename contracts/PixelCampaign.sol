@@ -65,19 +65,19 @@ contract PixelCampaign is Ownable {
 
     function enterState(States _newState) internal {
         if (_newState == States.Unfunded) {
-
+            revert();
         }
         else if (_newState == States.Funded) {
-            
+            require(currentState == States.Unfunded);
         }
         else if (_newState == States.Accepted) {
-            
+            require(currentState == States.Funded);
         }
         else if (_newState == States.InfluencerFundsReleased) {
-            
+            require(currentState == States.Accepted);
         }
         else if (_newState == States.Disapproved) {
-            
+            require(currentState == States.Accepted || currentState == States.Funded);
         }
         currentState = _newState;
     }
@@ -94,29 +94,35 @@ contract PixelCampaign is Ownable {
         fanSingleAllocation = _fanSingleAllocation;
         verifierSingleAllocation = _verifierSingleAllocation;
         fanCount = _fanCount;
-
         require(token.transferFrom(msg.sender, this, getTotalFunding()));
         enterState(States.Funded);
+
         emit Funded(msg.sender);
     }
 
     function accept() public onlyAtState(States.Funded) onlyWhitelisted(msg.sender) {
         require(influencer == 0x0);
+
         influencer = msg.sender;
         enterState(States.Accepted);
+
         emit Accepted(msg.sender);
     }
 
     function disapprove() public onlyOwner onlyAfterDeadline {
         require(currentState == States.Funded || currentState == States.Accepted);
+
         require(token.transfer(owner, influencerTotalAllocation));
         enterState(States.Disapproved);
+
         emit Disapproved();
     }
 
     function releaseInfluencerFunds() public onlyOwner onlyAtState(States.Accepted) {
         require(token.transfer(influencer, influencerTotalAllocation));
+
         enterState(States.InfluencerFundsReleased);
+
         emit InfluencerFundsReleased();
     }
 

@@ -118,7 +118,7 @@ describe('PixelCampaign', () => {
   });
 
   describe('Funding', async () => {
-    const isFunded = async (campaign) => (await campaign.methods.currentState().call()) !== STATE_UNFUNDED;
+    const isFunded = async (campaign) => (await campaign.methods.currentState().call()) === STATE_FUNDED;
     let unfundedCampaign;
 
     const increaseApproval = async() => {
@@ -179,14 +179,18 @@ describe('PixelCampaign', () => {
 
   describe('Accepting campaign', async () => {
     const testShouldAccept = async (from) => {
+      expect(await getCurrentState()).to.not.be.equal(STATE_ACCEPTED);
       await accept(from);
       expect(await campaignContract.methods.influencer().call()).to.be.equal(from);
+      expect(await getCurrentState()).to.be.equal(STATE_ACCEPTED);
     };
 
     const testShouldNotAccept = async (from) => {
+      const initialState = await getCurrentState();
       const initialInfluencer = await campaignContract.methods.influencer().call();
       await expectThrow(accept(from));
       expect(await campaignContract.methods.influencer().call()).to.be.equal(initialInfluencer);
+      expect(await getCurrentState()).to.be.equal(initialState);
     };
 
     it('Should allow to be accepted by whitelisted influencer', async () => {
