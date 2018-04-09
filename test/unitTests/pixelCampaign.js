@@ -46,6 +46,7 @@ describe('PixelCampaign', () => {
   const STATE_DISAPPROVED = '4';
 
   const balanceOf = async (client) => tokenContract.methods.balanceOf(client).call({from: tokenOwner});
+  const getTotalFunding = async () => campaignContract.methods.getTotalFunding().call({from: brand});
   const accept = async (influencer) => campaignContract.methods.accept().send({from: influencer});
   const advanceToAfterDeadline = async () => increaseTimeTo(web3, deadline.add(duration.hours(12)));
   const disapprove = async (from) => campaignContract.methods.disapprove().send({from});
@@ -83,60 +84,72 @@ describe('PixelCampaign', () => {
       whitelistContractAddress,
       criteria,
       deadline,
-      verifier
+      verifier,
+      influencerTotalAllocation,
+      fanSingleAllocation,
+      verifierSingleAllocation,
+      fanCount
     ];
     campaignContract = await deployContract(web3, pixelCampaignJson, brand, campaingArgs);
     campaignContractAddress = campaignContract.options.address;
 
     // funding
     await tokenContract.methods.increaseApproval(campaignContractAddress, funding).send({from: brand});
-    await campaignContract.methods.fund(influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount).send({from: brand});
+    await campaignContract.methods.fund().send({from: brand});
   });
 
   describe('Creating campaign', async () => {
     const testShouldFailToCreate = async (args) => {
       await expectThrow(deployContract(web3, pixelCampaignJson, brand, args));
     };
+    const testShouldCreate = async (args) => {
+      await deployContract(web3, pixelCampaignJson, brand, args);
+    };
 
     it('Should not allow to create campaign without token or whitelist address', async () => {
-      await testShouldFailToCreate([tokenContractAddress, '0x0', criteria, deadline, verifier]);
-      await testShouldFailToCreate(['0x0', whitelistContractAddress, criteria, deadline, verifier]);
+      await testShouldFailToCreate([tokenContractAddress, '0x0', criteria, deadline, verifier, influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount]);
+      await testShouldFailToCreate(['0x0', whitelistContractAddress, criteria, deadline, verifier, influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount]);
     });
 
     it('Should not allow to create campaign without criteria', async () => {
-      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, '', deadline, verifier]);
+      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, '', deadline, verifier, influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount]);
     });
 
     it('Should not allow to create campaign with invalid deadline', async () => {
       const now = new BN(await latestTime(web3));
-      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, criteria, now - 10, verifier]);
+      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, criteria, now - 10, verifier, influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount]);
     });
 
     it('Should not allow to create campaign without verifier', async () => {
-      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, criteria, deadline, zeroAddress]);
+      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, criteria, deadline, zeroAddress, influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount]);
+    });
+
+    it('Should not allow to create campaign without influencer funds', async () => {
+      await testShouldFailToCreate([tokenContractAddress, whitelistContractAddress, criteria, deadline, verifier, 0, fanSingleAllocation, verifierSingleAllocation, fanCount]);
+    });
+
+    it('Should allow to create campaign without fans', async () => {
+      await testShouldCreate([tokenContractAddress, whitelistContractAddress, criteria, deadline, verifier, influencerTotalAllocation, 0, 0, 0]);
     });
   });
 
   describe('Funding', async () => {
     const isFunded = async (campaign) => (await campaign.methods.currentState().call()) === STATE_FUNDED;
     let unfundedCampaign;
+    const fund = async () => unfundedCampaign.methods.fund().send({from: brand});
 
     const increaseApproval = async() => {
       await tokenContract.methods.increaseApproval(unfundedCampaign.options.address, funding).send({from: brand});
     };
 
-    const fund = async (args) => {
-      await unfundedCampaign.methods.fund.apply(this, args).send({from: brand});
-    };
-    const fundArgs = [influencerTotalAllocation, fanSingleAllocation, verifierSingleAllocation, fanCount];
-
-    const testShouldFund = async (args) => {
-      await fund(args);
+    const testShouldFund = async () => {
+      console.log('funding');
+      await fund();
       expect(await isFunded(unfundedCampaign)).to.be.true;
     };
 
-    const testShouldNotFund = async (args) => {
-      await expectThrow(fund(args));
+    const testShouldNotFund = async () => {
+      await expectThrow(fund());
       expect(await isFunded(unfundedCampaign)).to.be.false;
       expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(0);
     };
@@ -149,31 +162,27 @@ describe('PixelCampaign', () => {
       expect(await isFunded(unfundedCampaign)).to.be.false;
     });
 
+    it('The total funding should be properly calculated', async () => {
+      const fanFunds = fanSingleAllocation.mul(fanCount);
+      const verifierFunds = verifierSingleAllocation.mul(fanCount);
+      const total = influencerTotalAllocation.add(fanFunds).add(verifierFunds);
+      expect(await getTotalFunding()).to.eq.BN(total);
+    });
+
     it('Should allow to fund', async () => {
       await increaseApproval();
-      await testShouldFund(fundArgs);
+      await testShouldFund();
       expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(funding);
     });
 
     it('Should not allow to fund without allowing tokens', async () => {
-      await testShouldNotFund(fundArgs);
+      await testShouldNotFund();
     });
 
     it('Should not allow to fund if brand does not have enough token balance', async () => {
       await increaseApproval();
       await tokenContract.methods.transfer(fan2, await balanceOf(brand)).send({from: brand});
-      await testShouldNotFund(fundArgs);
-    });
-
-    it('Should not allow to fund without influencer funds', async () => {
-      await increaseApproval();
-      await testShouldNotFund([0, fanSingleAllocation, verifierSingleAllocation, fanCount]);
-    });
-
-    it('Should allow to fund without fans', async () => {
-      await increaseApproval();
-      await testShouldFund([influencerTotalAllocation, 0, 0, 0]);
-      expect(await balanceOf(unfundedCampaign.options.address)).to.eq.BN(influencerTotalAllocation);
+      await testShouldNotFund();
     });
   });
 

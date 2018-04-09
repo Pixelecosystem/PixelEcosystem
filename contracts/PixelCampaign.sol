@@ -7,10 +7,10 @@ import "ethworks-solidity/contracts/Whitelist.sol";
 contract PixelCampaign is Ownable {
     using SafeMath for uint256;
 
-    event Funded(address _funder);
-    event Accepted(address _influencer);
+    event Funded(address funder);
+    event Accepted(address influencer);
     event InfluencerFundsReleased();
-    event FanFundsReleased(address _fan);
+    event FanFundsReleased(address fan);
     event VerifierFundsReleased();
     event Disapproved();
 
@@ -29,18 +29,33 @@ contract PixelCampaign is Ownable {
     address public influencer = 0x0;
     uint256 public releasedFanCount = 0;
 
-    function PixelCampaign(CrowdfundableToken _token, Whitelist _whitelist, string _criteria, uint256 _deadline, address _verifier) public {
+    function PixelCampaign(
+        CrowdfundableToken _token,
+        Whitelist _whitelist,
+        string _criteria,
+        uint256 _deadline,
+        address _verifier,
+        uint256 _influencerTotalAllocation,
+        uint256 _fanSingleAllocation,
+        uint256 _verifierSingleAllocation,
+        uint256 _fanCount
+    ) public {
         require(address(_token) != 0x0);
         require(address(_whitelist) != 0x0);
         require(bytes(_criteria).length > 0);
         require(_deadline > now);
         require(_verifier != 0x0);
+        require(_influencerTotalAllocation > 0);
 
         token = _token;
         whitelist = _whitelist;
         criteria = _criteria;
         deadline = _deadline;
         verifier = _verifier;
+        influencerTotalAllocation = _influencerTotalAllocation;
+        fanSingleAllocation = _fanSingleAllocation;
+        verifierSingleAllocation = _verifierSingleAllocation;
+        fanCount = _fanCount;
     }
 
     modifier onlyWhitelisted(address _address) {
@@ -50,6 +65,11 @@ contract PixelCampaign is Ownable {
 
     modifier onlyAtState(States _state) {
         require(currentState == _state);
+        _;
+    }
+
+    modifier onlyAtStates(States _state1, States _state2) {
+        require(currentState == _state1 || currentState == _state2);
         _;
     }
 
@@ -63,66 +83,31 @@ contract PixelCampaign is Ownable {
         _;
     }
 
-    function enterState(States _newState) internal {
-        if (_newState == States.Unfunded) {
-            revert();
-        }
-        else if (_newState == States.Funded) {
-            require(currentState == States.Unfunded);
-        }
-        else if (_newState == States.Accepted) {
-            require(currentState == States.Funded);
-        }
-        else if (_newState == States.InfluencerFundsReleased) {
-            require(currentState == States.Accepted);
-        }
-        else if (_newState == States.Disapproved) {
-            require(currentState == States.Accepted || currentState == States.Funded);
-        }
-        currentState = _newState;
+    function getTotalFunding() public view returns(uint256) {
+        return fanSingleAllocation.add(verifierSingleAllocation).mul(fanCount).add(influencerTotalAllocation);
     }
 
-    function getTotalFunding() internal view returns(uint256) {
-        return influencerTotalAllocation.add(fanSingleAllocation.mul(fanCount)).add(verifierSingleAllocation.mul(fanCount));
-    }
-
-    function fund(uint256 _influencerTotalAllocation, uint256 _fanSingleAllocation, uint256 _verifierSingleAllocation, uint256 _fanCount) 
-            onlyAtState(States.Unfunded) public {
-        require(_influencerTotalAllocation > 0);
-
-        influencerTotalAllocation = _influencerTotalAllocation;
-        fanSingleAllocation = _fanSingleAllocation;
-        verifierSingleAllocation = _verifierSingleAllocation;
-        fanCount = _fanCount;
+    function fund() onlyAtState(States.Unfunded) public {
         require(token.transferFrom(msg.sender, this, getTotalFunding()));
-        enterState(States.Funded);
-
+        currentState = States.Funded;
         emit Funded(msg.sender);
     }
 
     function accept() public onlyAtState(States.Funded) onlyWhitelisted(msg.sender) {
-        require(influencer == 0x0);
-
         influencer = msg.sender;
-        enterState(States.Accepted);
-
+        currentState = States.Accepted;
         emit Accepted(msg.sender);
     }
 
-    function disapprove() public onlyOwner onlyAfterDeadline {
-        require(currentState == States.Funded || currentState == States.Accepted);
-
+    function disapprove() public onlyOwner onlyAfterDeadline onlyAtStates(States.Funded, States.Accepted) {
         require(token.transfer(owner, influencerTotalAllocation));
-        enterState(States.Disapproved);
-
+        currentState = States.Disapproved;
         emit Disapproved();
     }
 
     function releaseInfluencerFunds() public onlyOwner onlyAtState(States.Accepted) {
         require(token.transfer(influencer, influencerTotalAllocation));
-
-        enterState(States.InfluencerFundsReleased);
-
+        currentState = States.InfluencerFundsReleased;
         emit InfluencerFundsReleased();
     }
 
