@@ -6,27 +6,33 @@ const whitelistJson = require('../build/contracts/Whitelist.json');
 const campaignJson = require('../build/contracts/PixelCampaign.json');
 
 describe('Deploying', async() => {
+  const tokenCap = 1000;
   const tokenArgs = [
-    1000 // token cap
+    tokenCap
   ];
   let owner;
+  let tokenContract;
   let tokenAddress;
+  let whitelistContract;
   let whitelistAddress;
 
   before(async () => {
     [owner] = await web3.eth.getAccounts();
-  });
 
-  it('Deploying pixel token', async() => {
-    const contract = await deployContract(web3, tokenJson, owner, tokenArgs);
-    tokenAddress = contract.options.address;
+    // token
+    tokenContract = await deployContract(web3, tokenJson, owner, tokenArgs);
+    tokenAddress = tokenContract.options.address;
     console.log(`Deployed pixel token at: ${tokenAddress}`);
-  });
 
-  it('Deploying whtelist', async() => {
-    const contract = await deployContract(web3, whitelistJson, owner, []);
-    whitelistAddress = contract.options.address;
+    // whitelist
+    whitelistContract = await deployContract(web3, whitelistJson, owner, []);
+    whitelistAddress = whitelistContract.options.address;
     console.log(`Deployed whitelist at: ${whitelistAddress}`);
+
+    // token minting
+    await tokenContract.methods.mint(owner, tokenCap).send({from: owner});
+    await tokenContract.methods.finishMinting().send({from: owner});
+    console.log('PixelToken: Finished minting');
   });
 
   it('Deploying pixel campaign', async() => {
