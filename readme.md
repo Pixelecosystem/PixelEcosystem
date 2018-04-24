@@ -1,21 +1,20 @@
 # PixelEcosystem
 
-## PixelToken
-
+## Pixelcoin
 
 | Item  | Value |
 | ------------- | ------------- |
 | Standard  | ERC20  |
 | Decimals | 18 |
-| Name | PixelToken |
+| Name | Pixelcoin |
 | Symbol | PXL |
 
 ## PixelCampaign
 
-The Smart Contract for managing campaign funded in PixelTokens. The campaign is created by a Brand.
-Campaign can be joined by an Influencer (whitelisted only).
-There is also a role of Verifier, who verifies uploads made by fans.
-The Campaign can be disapproved/reimbursed by the Brand after specified deadline.
+The Smart Contract for managing campaign funded in Pixelcoins.
+Campaign, created by a brand, can be joined by an influencer (whitelisted only).
+There is also a role of a *verifier*, who verifies uploads made by fans.
+The Campaign can be disapproved/reimbursed by the brand (only after specified deadline).
 
 ### Events
 
@@ -23,18 +22,20 @@ The campaign Smart Contracts emits the following events on the blockchain:
 
 | Event  | Description |
 | ------------- | ------------- |
-| Funded  | After the Brand stakes funds in PixelToken for the campaign |
-| Accepted  | After an Influencer joins the campaign |
-| InfluencerFundsReleased  | After the Influencer's upload has been approved by the Brand. Influencer gets paid. |
+| Funded  | After the brand stakes funds (in Pixelcoins) for the campaign |
+| Accepted  | After an influencer joins the campaign |
+| InfluencerFundsReleased  | After the influencer's upload has been approved by the brand. Influencer gets paid. |
 | FanFundsReleased  | After verifier approves a fan's upload. Fan gets paid. |
-| VerifierFundsReleased  | Same as FanFundsReleased, Verifier gets paid. |
-| Disapproved  | After the brand disapproves the Influencer after the deadline. Tokens reserved for the Influencer are returned to the Brand |
+| VerifierFundsReleased  | Verifier gets paid after approving a fan. |
+| Disapproved  | After the brand disapproves the influencer after the deadline. Funds reserved for the influencer's payout are returned to the brand |
 
 ## Whitelist
 
-The whitelist Smart Contract is used to restrict the campaign so that only whitelisted Influencers can join. The fans are getting paid after being verified by the Verifier, and do not have to be on the Whitelist.
+The whitelist Smart Contract is used to restrict the campaign so that only whitelisted influencers can join. The fans are getting paid after being verified by the Verifier, and do not have to be on the whitelist.
 
-## Deploying
+## Deploying and testing
+
+### Deploying
 
 If you are running Parity node on your device you can deploy the contracts with placeholder values (like deadline or soft criteria) using the following command:
 
@@ -44,11 +45,11 @@ npm run deploy
 
 Placeholder values can be changed in **scripts/deploy.js** file.
 
-## Parity wallet
+### ABI
 
-If you are using the Parity Wallet, you can watch the smart contracts by importing ABI files located in **abi** folder.
+ABI (Application binary interface) files located in **abi** folder.
 
-## Tests
+### Testing
 
 There is an extensive set of tests that can be run using the following command:
 ```javascript

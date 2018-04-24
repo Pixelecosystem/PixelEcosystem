@@ -1,5 +1,5 @@
 import {createWeb3, deployContract, expectThrow, increaseTimeTo, durationInit, latestTime} from 'ethworks-solidity';
-import pixelTokenJson from '../../build/contracts/PixelToken.json';
+import pixelcoinJson from '../../build/contracts/Pixelcoin.json';
 import pixelCampaignJson from '../../build/contracts/PixelCampaign.json';
 import whitelistJson from '../../build/contracts/Whitelist.json';
 import Web3 from 'web3';
@@ -62,12 +62,12 @@ describe('PixelCampaign', () => {
   });
 
   beforeEach(async () => {
-    // PixelToken
+    // Pixelcoin
     const tokenArgs = [tokenCap];
-    tokenContract = await deployContract(web3, pixelTokenJson, tokenOwner, tokenArgs);
+    tokenContract = await deployContract(web3, pixelcoinJson, tokenOwner, tokenArgs);
     tokenContractAddress = tokenContract.options.address;
 
-    // PixelToken minting and allowance
+    // Pixelcoin minting and allowance
     await tokenContract.methods.mint(brand, tokenCap).send({from: tokenOwner});
     await tokenContract.methods.finishMinting().send({from: tokenOwner});
 

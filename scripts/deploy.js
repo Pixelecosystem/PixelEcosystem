@@ -1,7 +1,7 @@
 import {deployContract} from 'ethworks-solidity';
 const Web3 = require('Web3');
 const web3 = new Web3(new Web3.providers.HttpProvider(`http://localhost:8545`));
-const tokenJson = require('../build/contracts/PixelToken.json');
+const tokenJson = require('../build/contracts/Pixelcoin.json');
 const whitelistJson = require('../build/contracts/Whitelist.json');
 const campaignJson = require('../build/contracts/PixelCampaign.json');
 
@@ -32,7 +32,7 @@ describe('Deploying', async() => {
     // token minting
     await tokenContract.methods.mint(owner, tokenCap).send({from: owner});
     await tokenContract.methods.finishMinting().send({from: owner});
-    console.log('PixelToken: Finished minting');
+    console.log('Pixelcoin: Finished minting');
   });
 
   it('Deploying pixel campaign', async() => {

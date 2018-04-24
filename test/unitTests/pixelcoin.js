@@ -1,5 +1,5 @@
 import {createWeb3, deployContract} from 'ethworks-solidity';
-import pixelTokenJson from '../../build/contracts/PixelToken.json';
+import pixelcoinJson from '../../build/contracts/Pixelcoin.json';
 import chai from 'chai';
 import bnChai from 'bn-chai';
 import Web3 from 'web3';
@@ -8,7 +8,7 @@ const {expect} = chai;
 const web3 = createWeb3(Web3);
 chai.use(bnChai(web3.utils.BN));
 
-describe('PixelToken', () => {
+describe('Pixelcoin', () => {
   const {BN} = web3.utils;
   let tokenOwner;
   let tokenContract;
@@ -22,7 +22,7 @@ describe('PixelToken', () => {
 
   beforeEach(async () => {
     const tokenArgs = [tokenCap];
-    tokenContract = await deployContract(web3, pixelTokenJson, tokenOwner, tokenArgs);
+    tokenContract = await deployContract(web3, pixelcoinJson, tokenOwner, tokenArgs);
     // tokenContractAddress = tokenContract.options.address;
   });
 
@@ -31,7 +31,7 @@ describe('PixelToken', () => {
     const symbol = await tokenContract.methods.symbol().call({from: tokenOwner});
     const cap = new BN(await tokenContract.methods.cap().call({from: tokenOwner}));
     const decimals = new BN(await tokenContract.methods.decimals().call({from: tokenOwner}));
-    expect(name).to.equal('PixelToken');
+    expect(name).to.equal('Pixelcoin');
     expect(symbol).to.equal('PXL');
     expect(cap).to.eq.BN(tokenCap);
     expect(decimals).to.eq.BN(18);
